@@ -12,6 +12,7 @@
 #include "advmot.h"
 #include <QFileDialog>
 #include <QTimer>
+#include "secondwidget.h"
 
 #include "stdafx.h"
 #include "antpath.h"
@@ -214,6 +215,9 @@ void MainWindow::on_main_init_clicked()
         if(t_Re == QMessageBox::Yes)
             return;
     }
+    mAdv.AxInit();
+    for (int z = 0; z < 3; z++)
+        mAdv.AxServSeton(z);
 }
 
 void MainWindow::on_main_link_clicked()
@@ -239,6 +243,7 @@ void MainWindow::on_main_link_clicked()
     if(r5 == MVST_SUCCESS)
     {
         camera.cam1_startgrab();
+        ui->main_go->setEnabled(true);
     }
     else
     {
@@ -248,13 +253,25 @@ void MainWindow::on_main_link_clicked()
     }
 }
 
+void MainWindow::on_main_go_clicked()
+{
+    int i = ui->main_position->currentIndex();
+    qDebug() << "the" << i << "spinrete";
+    mAdv.GpGo(i);
+    mAdv.paraSet(8000, 2000, 20000, 20000, 0, -7518800, 200);
+    mAdv.AxGo(0);
+    mAdv.AxStateJudge(0);
+    ui->main_start->setEnabled(true);
+}
+
 void MainWindow::on_main_start_clicked()
 {
     ui->main_start->setEnabled(false);
     ui->main_restart->setEnabled(false);
+    //若不是处于暂停，则从头开始检测
     if(running == false)
     {
-        //停止全局相机，孔群图像处理
+        //----------------------停止全局相机，孔群图像处理----------------------------//
         camera.cam1_stopgrab();
         camera.whole_findholes();
         //显示孔群
@@ -262,31 +279,17 @@ void MainWindow::on_main_start_clicked()
         pixmap = pixmap.fromImage(camera.cam1_qimg);
         pixmap = pixmap.scaled(ui->main_cam1->width(), ui->main_cam1->height(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
         ui->main_cam1->setPixmap(pixmap);
-        Delay_MSec(100);
-
-//        MVSTATUS_CODES r = MVStartGrab(camera.m_hCam_micro, StreamCB_micro, (ULONG_PTR)this);
-//        if(r == MVST_SUCCESS)
-//        {
-//            camera.cam2_startgrab();
-//            ui->equip_stopcam2->setEnabled(true);
-//            ui->equip_grabcam2->setEnabled(false);
-//            ui->equip_singlegrabcam2->setEnabled(false);
-//            ui->equip_savecam2->setEnabled(true);
-//        }
-//        else
-//        {
-//            QMessageBox::StandardButton t_Re = QMessageBox::warning(this,"失败","微孔相机无法连续拍摄!",QMessageBox::Yes);
-//            if(t_Re == QMessageBox::Yes)
-//                return;
-//        }
+        Delay_MSec(100);//无延时图像无法正常显示
+        //获取当前轴位置
         Acm_AxGetActualPosition(mAdv.pAxisHandle[1], &PPU_now[1]);
         Acm_AxGetActualPosition(mAdv.pAxisHandle[2], &PPU_now[2]);
+        //将孔群像素位置转化为PPU位置
         for(int i = 0; i < iHolesNum; i++)
         {
             x_Ary[i] = PPU_now[1] + (x_Ary[i]-1226.6)*49.087 - 127570;
-            y_Ary[i] = PPU_now[2] - (y_Ary[i]-1030)*49.087 + 530;
+            y_Ary[i] = PPU_now[2] - (y_Ary[i]-1030)*48.9 + 470;
         }
-       // 轨迹规划
+        //-------------------------------轨迹规划-------------------------------------//
         //初始化随机种子
         time_t tm;
         time(&tm);
@@ -325,57 +328,80 @@ void MainWindow::on_main_start_clicked()
         pixmap = pixmap.fromImage(camera.cam1_qimg);
         pixmap = pixmap.scaled(ui->main_cam1->width(), ui->main_cam1->height(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
         ui->main_cam1->setPixmap(pixmap);
-        Delay_MSec(100);
-
+        Delay_MSec(50);
+        //将检测状态设为正在运行
         running = true;
         ui->main_pause->setEnabled(true);
         ui->main_stop->setEnabled(true);
-
-        for (int i = 0; i < iHolesNum; i++)
+        //-----------------------运动到第一个微孔---------------------------//
+        mAdv.GpMov(0, rePath[0]);
+//        zhizhen= new second;
+//        zhizhen->show();
+//        mWidget = new secondWidget(this);//this是否需要暂定
+//        QLabel *zLbl = new QLabel(mWidget);
+//        zLbl->setNum(10);
+//        mWidget->show();
+        //----------------------------对焦--------------------------------//
+        camera.focusValue = 0;
+        mAdv.paraSet(2000, 2000, 10000, 10000, 0, 0, -50);
+        do
+        {
+            mAdv.AxMov(0);
+            mAdv.AxStateJudge(0);
+            Delay_MSec(50);
+            camera.cam2_singlegrab();
+            pixmap = pixmap.fromImage(camera.cam2_qimg);
+            pixmap = pixmap.scaled(ui->main_cam2->width(), ui->main_cam2->height(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            ui->main_cam2->setPixmap(pixmap);
+            QPixmap pixmap2 = pixmap2.fromImage(camera.cam2_qimg);
+            Delay_MSec(50);
+        }while(camera.micro_focus());
+        //------------------------第一个孔的检测结果----------------------------//
+        camera.micro_checkhole();
+        ui->mainlabel7->setText(camera.str);
+        //------------------------剩余孔的检测结果----------------------------//
+        for (int i = 1; i < iHolesNum; i++)
         {
             mAdv.GpMov(i, rePath[i]); //执行直线插补运动
+            mAdv.GpStateJudge();
+            if (running == false)
+                break;
             Delay_MSec(100);
-            MVSTATUS_CODES r4 = MVSingleGrab(camera.m_hCam_micro,camera.m_hImg_micro, 150);
-            if (r4 == MVST_SUCCESS)
-            {
-                camera.micro_checkhole();
-                ui->mainlabel7->setText(camera.str);
-                pixmap = pixmap.fromImage(camera.cam2_qimg);
-                pixmap = pixmap.scaled(ui->main_cam2->width(), ui->main_cam2->height(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-                ui->main_cam2->setPixmap(pixmap);
-//                MVSTATUS_CODES r = MVStartGrab(camera.m_hCam_micro, StreamCB_micro, (ULONG_PTR)this);
-//                if(r == MVST_SUCCESS)
-//                {
-//                    camera.cam2_startgrab();
-//                    Delay_MSec(50);
-//                }
-//                else
-//                {
-//                    QMessageBox::StandardButton t_Re = QMessageBox::warning(this,"warning","single grab failed",QMessageBox::Yes);
-//                    if(t_Re == QMessageBox::Yes)
-//                    {return;}
-//                }
-            }
-            else
-            {
-                QMessageBox::StandardButton t_Re = QMessageBox::warning(this,"warning","single grab failed",QMessageBox::Yes);
-                if(t_Re == QMessageBox::Yes)
-                {return;}
-            }
+            MVSingleGrab(camera.m_hCam_micro,camera.m_hImg_micro, 150);
+            camera.micro_checkhole();
+            ui->mainlabel7->setText(camera.str);
+            pixmap = pixmap.fromImage(camera.cam2_qimg);
+            pixmap = pixmap.scaled(ui->main_cam2->width(), ui->main_cam2->height(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            ui->main_cam2->setPixmap(pixmap);
+            Delay_MSec(50);
         }
-
-        //开始运动到第一个孔
-        //对焦
-        //微孔检测
     }
-    //继续剩余所有孔运动+检测
-    //所有检测结束后
+    //如果是暂停继续剩余所有孔运动+检测
+    //-------------------------孔群检测结束----------------------------//
     running = false;
     ui->main_start->setEnabled(true);
     ui->main_restart->setEnabled(true);
     ui->main_pause->setEnabled(false);
     ui->main_stop->setEnabled(false);
     delete_New(iHolesNum);
+}
+
+void MainWindow::on_main_stop_clicked()
+{
+    running = false;
+    ui->main_stop->setEnabled(false);
+    ui->main_start->setEnabled(true);
+    ui->main_restart->setEnabled(true);
+    ui->main_pause->setEnabled(false);
+}
+
+void MainWindow::on_main_restart_clicked()
+{
+//    on_main_start_clicked();
+//    ui->main_start->setEnabled(false);
+//    ui->main_restart->setEnabled(false);
+//    ui->main_pause->setEnabled(true);
+//    ui->main_stop->setEnabled(true);
 }
 
 void MainWindow::on_m_ShowBtn_clicked()
@@ -1074,9 +1100,75 @@ void MainWindow::on_equip_savecam2_clicked()
     camera.cam2_startgrab();
 }
 
-void MainWindow::on_main_go_clicked()
+void MainWindow::on_main_movex_clicked()
 {
-    int i = ui->main_position->currentIndex();
-    qDebug() << "the" << i << "spinrete";
-    mAdv.GpGo(i);
+    mAdv.AxServSeton(1);
+}
+
+void MainWindow::on_main_movey_clicked()
+{
+    mAdv.AxServSeton(2);
+}
+
+void MainWindow::on_main_movez_clicked()
+{
+    mAdv.AxServSeton(0);
+}
+
+void MainWindow::on_main_moveup_clicked()
+{
+    //默认一次移动50PPU
+    F64 TargetDis = 50;
+    TargetDis = -(ui->DisLineEdit->text().toDouble());
+    mAdv.paraSet(5000, 2000, 20000, 20000, 0, 0, TargetDis);
+    mAdv.AxMov(0);
+}
+
+
+void MainWindow::on_main_movedown_clicked()
+{
+    //默认一次移动50PPU
+    F64 TargetDis = 50;
+    TargetDis = ui->DisLineEdit->text().toDouble();
+    mAdv.paraSet(5000, 2000, 20000, 20000, 0, 0, TargetDis);
+    mAdv.AxMov(0);
+}
+
+void MainWindow::on_main_moveright_clicked()
+{
+    F64 TargetDis = 5000;
+    TargetDis = ui->DisLineEdit->text().toDouble();
+    mAdv.paraSet(5000, 2000, 20000, 20000, 0, 0, TargetDis);
+    mAdv.AxMov(1);
+}
+
+void MainWindow::on_main_moveleft_clicked()
+{
+    F64 TargetDis = 5000;
+    TargetDis = -(ui->DisLineEdit->text().toDouble());
+    mAdv.paraSet(5000, 2000, 20000, 20000, 0, 0, TargetDis);
+    mAdv.AxMov(1);
+}
+
+void MainWindow::on_main_movefront_clicked()
+{
+    F64 TargetDis = 5000;
+    TargetDis = ui->DisLineEdit->text().toDouble();
+    mAdv.paraSet(5000, 2000, 20000, 20000, 0, 0, TargetDis);
+    mAdv.AxMov(2);
+}
+
+void MainWindow::on_main_moveback_clicked()
+{
+    F64 TargetDis = 5000;
+    TargetDis = -(ui->DisLineEdit->text().toDouble());
+    mAdv.paraSet(5000, 2000, 20000, 20000, 0, 0, TargetDis);
+    mAdv.AxMov(2);
+}
+
+void MainWindow::on_navibut3_clicked()
+{
+    mAdv.AxInit();
+    for (int i = 0; i < 3; i++)
+        mAdv.AxServSeton(i);
 }

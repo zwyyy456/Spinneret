@@ -10,6 +10,11 @@ AdvMot::AdvMot(U32 devSeries)
 {
     u32Ret = Acm_DevOpen(devSeries, &pDevHandle);//打开板卡，获取设备Handle
     u32Ret = devSeries;
+
+}
+
+void AdvMot::AxInit()
+{
     u32Ret = Acm_GetU32Property(pDevHandle, FT_DevAxesCount, &u32AxisCount);//获取轴数量
 
         //根据轴数，将所有轴打开
@@ -21,15 +26,10 @@ AdvMot::AdvMot(U32 devSeries)
     }
     u32Ret = Acm_GpAddAxis(&pGroupHandle, pAxisHandle[1]);
     u32Ret = Acm_GpAddAxis(&pGroupHandle, pAxisHandle[2]);
-    u32Ret = Acm_AxSetSvOn(pAxisHandle[0], 1);//打开0轴伺服
-    u32Ret = Acm_AxSetSvOn(pAxisHandle[1], 1);
-    u32Ret = Acm_AxSetSvOn(pAxisHandle[2], 1);
+//    u32Ret = Acm_AxSetSvOn(pAxisHandle[0], 1);//打开0轴伺服
+//    u32Ret = Acm_AxSetSvOn(pAxisHandle[1], 1);
+//    u32Ret = Acm_AxSetSvOn(pAxisHandle[2], 1);
     qDebug() << "init successfully";
-}
-
-void AdvMot::AxInit()
-{
-    qDebug() << "init success";
 }
 
 void AdvMot::paraSet(U32 vmax, U32 vmin, U32 acc, U32 dec, I32 axJerk, F64 targetPos, F64 targetDis)
@@ -74,6 +74,16 @@ void AdvMot::AxMov(int selectXYZ)
     Acm_AxGetCmdPosition(pAxisHandle[selectXYZ], &fCmdPosition);
     Acm_AxGetActualPosition(pAxisHandle[selectXYZ], &fActPosition);
     Acm_AxGetState(pAxisHandle[selectXYZ], &u16State);
+
+//    //判断轴状态，不为ready时延时
+//    do
+//    {
+//        u32Ret = Acm_AxGetState(pAxisHandle[selectXYZ], &u16State);
+//        //cout << GpState << endl;
+//        // 群组状态错误时复位
+//        if (u16State == 3)
+//            u32Ret = Acm_AxResetError(pAxisHandle[selectXYZ]);
+//    }while(u16State != 1);
 }
 void AdvMot::GpGo(int i)
 {
@@ -88,16 +98,27 @@ void AdvMot::GpGo(int i)
     u32Ret = Acm_GpGetState(pGroupHandle, &GpState);
 //    qDebug() << GpState << endl;
 
-    //判断轴状态，不为ready时延时
-    do
-    {
-        u32Ret = Acm_GpGetState(pGroupHandle, &GpState);
-        //cout << GpState << endl;
-        // 群组状态错误时复位
-        if (GpState == 3)
-            u32Ret = Acm_GpResetError(pGroupHandle);
-    }while(GpState != 1);
+//    //判断轴状态，不为ready时延时
+//    do
+//    {
+//        u32Ret = Acm_GpGetState(pGroupHandle, &GpState);
+//        //cout << GpState << endl;
+//        // 群组状态错误时复位
+//        if (GpState == 3)
+//            u32Ret = Acm_GpResetError(pGroupHandle);
+//    }while(GpState != 1);
+
     u32Ret = Acm_GpMoveLinearAbs(pGroupHandle, m_spinneret[i], &ArrayElementCnt);
+
+//    //判断轴状态，不为ready时延时
+//    do
+//    {
+//        u32Ret = Acm_GpGetState(pGroupHandle, &GpState);
+//        //cout << GpState << endl;
+//        // 群组状态错误时复位
+//        if (GpState == 3)
+//            u32Ret = Acm_GpResetError(pGroupHandle);
+//    }while(GpState != 1);
 
 }
 
@@ -123,21 +144,54 @@ void AdvMot::GpMov(int i, double *holeArray)
     //运动到第一个孔的位置
     u32Ret = Acm_GpMoveLinearAbs(pGroupHandle, holeMov, &ArrayElementCnt);
 
-    //判断轴状态，不为ready时延时
-    do
-    {
-        u32Ret = Acm_GpGetState(pGroupHandle, &GpState);
-        //cout << GpState << endl;
+//    //判断轴状态，不为ready时延时
+//    do
+//    {
+//        u32Ret = Acm_GpGetState(pGroupHandle, &GpState);
+//        //cout << GpState << endl;
 
 
-        // 群组状态错误时复位
-        if (GpState == 3)
-            u32Ret = Acm_GpResetError(pGroupHandle);
-    }while(GpState != 1);
+//        // 群组状态错误时复位
+//        if (GpState == 3)
+//            u32Ret = Acm_GpResetError(pGroupHandle);
+//    }while(GpState != 1);
+}
+
+void AdvMot::AxServSeton(int i)
+{
+    u32Ret = Acm_AxSetSvOn(pAxisHandle[i], 1);
 }
 void AdvMot::ztest()
 {
     qDebug() << "zwy test successfully";
+}
+
+void AdvMot::AxStateJudge(int selectXYZ)
+{
+    //判断轴状态，不为ready时延时
+    do
+    {
+        u32Ret = Acm_AxGetState(pAxisHandle[selectXYZ], &u16State);
+        //cout << GpState << endl;
+        // 群组状态错误时复位
+        if (u16State == 3)
+            u32Ret = Acm_AxResetError(pAxisHandle[selectXYZ]);
+    }while(u16State != 1);
+}
+
+void AdvMot::GpStateJudge()
+{
+        //判断轴状态，不为ready时延时
+        do
+        {
+            u32Ret = Acm_GpGetState(pGroupHandle, &GpState);
+            //cout << GpState << endl;
+
+
+            // 群组状态错误时复位
+            if (GpState == 3)
+                u32Ret = Acm_GpResetError(pGroupHandle);
+        }while(GpState != 1);
 }
 
 AdvMot::~AdvMot()

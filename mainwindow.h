@@ -3,7 +3,8 @@
 
 #include <QMainWindow>
 #include "GigECamera_Types.h"
-
+#include "second.h"
+#include"secondwidget.h"
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
@@ -75,6 +76,30 @@ private slots:
     void on_equip_savecam2_clicked();
 
     void on_main_go_clicked();
+
+    void on_main_movex_clicked();
+
+    void on_main_movey_clicked();
+
+    void on_main_movez_clicked();
+
+    void on_main_moveup_clicked();
+
+    void on_main_movedown_clicked();
+
+    void on_main_moveright_clicked();
+
+    void on_main_moveleft_clicked();
+
+    void on_main_movefront_clicked();
+
+    void on_main_moveback_clicked();
+
+    void on_navibut3_clicked();
+
+    void on_main_stop_clicked();
+
+    void on_main_restart_clicked();
 
 private:
     Ui::MainWindow *ui;

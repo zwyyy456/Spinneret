@@ -382,3 +382,18 @@ void vision::micro_checkhole()
     str.append("block ratio: "+QString::number(dsl*100)+"%\n");
     str.append("circle error: "+QString::number(yd)+"\n");
 }
+
+bool vision::micro_focus()
+{
+    cam2_mat = QImage2cvMat(cam2_qimg);
+    cv::Mat sobel;
+    cv::Sobel(cam2_mat, sobel, CV_16U, 1, 1);
+    double meanValue = mean(sobel)[0];
+    if(meanValue <= focusValue)
+        return false;
+    else
+    {
+        focusValue = meanValue;
+        return true;
+    }
+}

@@ -23,6 +23,7 @@ public:
     char cam1_IP[20];
     char cam2_IP[20];
     int pix[300][2];
+    double focusValue;
     vision()
     {
         n_cams = 0;
@@ -56,6 +57,7 @@ public:
     void cam2_stopgrab();
     void whole_findholes();
     void micro_checkhole();
+    bool micro_focus();
     ~vision()
     {
         //关闭微孔相机及属性页

@@ -14,6 +14,9 @@ public:
     void AxGo(int selectXYZ);
     void GpGo(int i);
     void GpMov(int i, double *holArray);
+    void AxServSeton(int i);
+    void AxStateJudge(int selectXYZ);
+    void GpStateJudge();
 //    void AxMovy(int selectXYZ);
 //    void AxGoy(int selectXYZ);
 //    void AxMovz(int selectXYZ);
